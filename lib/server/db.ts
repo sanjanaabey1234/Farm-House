@@ -1,5 +1,5 @@
 import 'server-only';
-import { MongoClient, type Db, MongoServerError } from 'mongodb';
+import { MongoClient, type Db, MongoParseError, MongoServerError, MongoServerSelectionError } from 'mongodb';
 
 // One MongoClient per server process (reused across hot reloads in dev).
 const g = globalThis as unknown as { _mongoClient?: Promise<MongoClient> };
@@ -64,7 +64,17 @@ export function dbErrorResponse(e: unknown): { status: number; message: string }
     if (e.code === 8000 || /space quota|storage/i.test(e.message)) return { status: 507, message: 'Storage is full. Delete old entries or upgrade the database plan.' };
   }
   const msg = e instanceof Error ? e.message : String(e);
-  if (/MONGODB_URI/.test(msg)) return { status: 500, message: msg };
   console.error(e);
+  // Server set-up problems: say exactly what to fix (these show on the first deploy, e.g. on Vercel).
+  if (/MONGODB_URI|AUTH_SECRET/.test(msg)) return { status: 500, message: `Server setup: ${msg}` };
+  if (/bad auth|authentication failed/i.test(msg) || (e instanceof MongoServerError && e.code === 18)) {
+    return { status: 500, message: 'Server setup: the database rejected the username or password in MONGODB_URI.' };
+  }
+  if (e instanceof MongoParseError || /Invalid scheme|URI must include hostname/i.test(msg)) {
+    return { status: 500, message: 'Server setup: MONGODB_URI is not a valid connection string. Special characters in the password must be URL-encoded.' };
+  }
+  if (e instanceof MongoServerSelectionError || /querySrv|ENOTFOUND|ECONNREFUSED|timed out|Server selection/i.test(msg)) {
+    return { status: 503, message: 'Cannot reach the database. In MongoDB Atlas → Network Access, allow this server\'s IP (for Vercel: 0.0.0.0/0).' };
+  }
   return { status: 503, message: 'Not saved. Check your connection and try again.' };
 }
