@@ -1,0 +1,32 @@
+{
+  "name": "chicken-wholesale-books",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chicken Wholesale Books — multi-client bookkeeping for chicken wholesale businesses (Next.js + MongoDB Atlas)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "db:indexes": "tsx scripts/create-indexes.ts",
+    "test:acceptance": "tsx scripts/acceptance-test.ts",
+    "template": "tsx scripts/make-template.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "exceljs": "^4.4.0",
+    "jose": "^6.2.12",
+    "mongodb": "^7.0.0",
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
