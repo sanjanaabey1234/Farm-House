@@ -12,6 +12,9 @@ function client(): Promise<MongoClient> {
       appName: 'chicken-wholesale-books',
       maxPoolSize: 10,
       retryWrites: true,
+      // Fail fast (well inside serverless time limits) so the user sees why, instead of a platform timeout page.
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 8000,
       // Read from the nearest member of the (global) cluster; writes always go to the primary.
       readPreference: (process.env.MONGODB_READ_PREFERENCE as 'nearest' | undefined) || 'primary',
     }).connect();
