@@ -1,6 +1,7 @@
 // Business rules and reports (requirements section 4). The Excel export reproduces the same rules as formulas.
 
 import { monthEnd, monthKey, monthsBetween } from './dates';
+import { amt } from './format';
 import type {
   BookData,
   Business,
@@ -99,10 +100,24 @@ export interface MoneyBookRow {
   balance: number;
 }
 
+/** One cash or bank movement (a sale, purchase, payment, wage or expense) with the book balance after it. */
+export interface MoneyBookEntry {
+  id: string;
+  date: string;
+  type: 'Sale' | 'Customer payment' | 'Purchase' | 'Supplier payment' | 'Wages' | 'Expense';
+  ref: string; // invoice no. or payment reference
+  party: string; // customer, supplier, employee or expense category
+  details: string;
+  in: number;
+  out: number;
+  balance: number;
+}
+
 export interface MoneyBook {
   method: 'Cash' | 'Bank';
   opening: number;
   rows: MoneyBookRow[]; // days with activity
+  entries: MoneyBookEntry[]; // every movement in date order, money in before money out on a day
   totalIn: number;
   totalOut: number;
   closing: number;
@@ -346,6 +361,40 @@ export function computeBooks(business: Business, all: BookData): Books {
     for (const w of data.wage) if (w.method === method) row(w.date).wages += wc(w).total;
     for (const e of data.expense) if (e.method === method) row(e.date).expenses += Number(e.amount) || 0;
     const rows = [...m.values()].sort((a, b) => a.date.localeCompare(b.date));
+    const entry = (e: Omit<MoneyBookEntry, 'balance'>): MoneyBookEntry => ({ ...e, balance: 0 });
+    const entries: MoneyBookEntry[] = [
+      ...data.sale
+        .filter((s) => s.payment === method)
+        .map((s) => {
+          const c = sc(s);
+          const part = Math.abs(c.credit) > 0.0001 ? ` · part-paid, ${amt(c.credit)} on credit` : '';
+          return entry({ id: s.id, date: s.date, type: 'Sale', ref: s.invoice, party: s.customer, details: `${s.kg} kg ${s.chickenType || ''} @ ${s.price}${part}`, in: c.received, out: 0 });
+        }),
+      ...data.cpay
+        .filter((p) => p.method === method)
+        .map((p) => entry({ id: p.id, date: p.date, type: 'Customer payment', ref: p.ref, party: p.customer, details: 'Payment received', in: Number(p.amount) || 0, out: 0 })),
+      ...data.purchase
+        .filter((p) => p.payment === method)
+        .map((p) => {
+          const c = pc(p);
+          const part = Math.abs(c.balance) > 0.0001 ? ` · part-paid, ${amt(c.balance)} owed` : '';
+          return entry({ id: p.id, date: p.date, type: 'Purchase', ref: p.invoice, party: p.supplier, details: `${p.kg} kg ${p.chickenType || ''} @ ${p.cost}${part}`, in: 0, out: c.paid });
+        }),
+      ...data.spay
+        .filter((p) => p.method === method)
+        .map((p) => entry({ id: p.id, date: p.date, type: 'Supplier payment', ref: p.ref, party: p.supplier, details: 'Payment made', in: 0, out: Number(p.amount) || 0 })),
+      ...data.wage
+        .filter((w) => w.method === method)
+        .map((w) => entry({ id: w.id, date: w.date, type: 'Wages', ref: '', party: w.employee, details: w.workType || w.basis, in: 0, out: wc(w).total })),
+      ...data.expense
+        .filter((e) => e.method === method)
+        .map((e) => entry({ id: e.id, date: e.date, type: 'Expense', ref: '', party: e.category, details: e.description, in: 0, out: Number(e.amount) || 0 })),
+    ].sort((a, b) => a.date.localeCompare(b.date) || Number(b.in > 0) - Number(a.in > 0));
+    let running = opening;
+    for (const e of entries) {
+      running += e.in - e.out;
+      e.balance = running;
+    }
     let bal = opening;
     let lowest = opening;
     let totalIn = 0;
@@ -363,6 +412,7 @@ export function computeBooks(business: Business, all: BookData): Books {
       method,
       opening,
       rows,
+      entries,
       totalIn,
       totalOut,
       closing: bal,

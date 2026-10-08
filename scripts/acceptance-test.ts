@@ -48,6 +48,8 @@ check('Expenses + wages', oct.expenses, 49000);
 check('Net profit', oct.netProfit, -37567);
 check('Closing cash', books.cash.closing, -527000);
 check('Closing bank', books.bank.closing, -45000);
+check('Cash book invoice-wise closing', books.cash.entries.at(-1)!.balance, books.cash.closing);
+check('Bank book invoice-wise closing', books.bank.entries.at(-1)!.balance, books.bank.closing);
 const owe = (n: string) => books.debtors.find((d) => d.name === n)!.balance;
 check('ABC Hotel owes', owe('ABC Hotel'), 5000);
 check('XYZ Restaurant owes', owe('XYZ Restaurant'), 32100);
