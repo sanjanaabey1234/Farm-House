@@ -4,8 +4,12 @@ import { json } from '@/lib/server/http';
 // Set-up check for a new deployment: open /api/health. Shows what is missing without revealing any secret.
 export async function GET() {
   const secret = process.env.AUTH_SECRET ?? '';
+  const uri = process.env.MONGODB_URI ?? '';
   const checks: Record<string, string> = {
-    MONGODB_URI: process.env.MONGODB_URI ? 'set' : 'MISSING',
+    MONGODB_URI: uri ? 'set' : 'MISSING',
+    // which cluster this server talks to (host only — never the password), to compare with .env.local
+    cluster: uri ? (/@([^/?]+)/.exec(uri)?.[1] ?? /^mongodb(?:\+srv)?:\/\/([^/?]+)/.exec(uri)?.[1] ?? 'unreadable') : '—',
+    MONGODB_DB: process.env.MONGODB_DB || 'chicken_wholesale_books (default)',
     AUTH_SECRET: !secret ? 'MISSING' : secret.length < 32 ? 'TOO SHORT (needs 32+ characters)' : 'set',
     database: 'not checked',
   };
